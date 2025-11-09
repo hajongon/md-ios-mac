@@ -54,15 +54,18 @@ struct ContentView: View {
                 }
             }
             .sheet(item: $selectedNote) { noteRef in
-                EditorView(
-                    text: $text,
-                    originalURL: noteRef.url
-                ) {
-                    store.save(text, to: noteRef.url)
-                    selectedNote = nil
+                NavigationStack {
+                    EditorView(
+                        text: $text,
+                        originalURL: noteRef.url
+                    ) {
+                        store.save(text, to: noteRef.url)
+                        selectedNote = nil
+                    }
+                    .navigationBarTitleDisplayMode(.inline) // 선택 사항: 타이틀 높이 줄이기
                 }
-
             }
+
         }
     }
 }

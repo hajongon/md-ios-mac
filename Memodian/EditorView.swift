@@ -1,3 +1,10 @@
+//
+//  EditorView.swift
+//  Memodian
+//
+//  Created by hajongon on 11/5/25.
+//
+
 import SwiftUI
 import MarkdownUI
 
@@ -17,6 +24,10 @@ struct EditorView: View {
     @State private var autosaveWork: DispatchWorkItem?
     @State private var mode: EditorMode = .edit
     @FocusState private var isEditingFocused: Bool
+    @State private var didCommit = false
+
+    // NEW: 캐시 옵저빙(버전 변화 감지)
+    @ObservedObject private var hlCache = HLCache.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,18 +40,34 @@ struct EditorView: View {
             .padding([.horizontal, .top])
 
             editorBody
-
-            HStack {
-                Spacer()
-                Button("Save") { commitOriginalWins() }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut("s", modifiers: [.command])
-                    .padding()
+        }
+        // .navigationTitle(mode == .edit ? "Edit" : "Preview")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { backCommitAndDismiss() } label: {
+                    Image(systemName: "chevron.left")
+                        .imageScale(.medium)
+                        .font(.system(size: 17, weight: .semibold))
+                        .padding(.trailing, 4)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
             }
         }
-        .navigationTitle(mode == .edit ? "Edit" : "Preview")
         .onAppear(perform: startIfNeeded)
-        .onDisappear { autosaveWork?.cancel() }
+        .onDisappear {
+            autosaveWork?.cancel()
+            backCommitAndDismiss()
+        }
+        // NEW: 프리뷰로 바뀌는 시점에 코드블록을 미리 하이라이트
+        .onChange(of: mode) { old, new in
+            if new == .preview {
+                HLCache.shared.prewarm(markdown: text)
+            }
+        }
     }
 
     @ViewBuilder
@@ -50,10 +77,14 @@ struct EditorView: View {
                 .font(.system(.body, design: .monospaced))
                 .focused($isEditingFocused)
                 .padding(.horizontal)
-                // ✅ iOS 17+ 권장 구문
-                .onChange(of: text) { oldValue, newValue in
+                .onChange(of: text) { _, newValue in
                     scheduleAutosave(newValue)
+                    // 선택: 짧은 지연 후 프리워밍
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        HLCache.shared.prewarm(markdown: newValue)
+                    }
                 }
+
         } else {
             ScrollView {
                 Markdown(text)
@@ -61,6 +92,8 @@ struct EditorView: View {
                     .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
                     .textSelection(.enabled)
                     .padding()
+                    // NEW: 캐시가 채워질 때마다 id가 바뀌어 첫 프레임 이후 즉시 리렌더
+                    .id(hlCache.version)
             }
         }
     }
@@ -85,14 +118,26 @@ struct EditorView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
     }
 
+    private func backCommitAndDismiss() {
+        commitOriginalWins()
+        // dismiss는 commit 내부에서 호출
+    }
+
     private func commitOriginalWins() {
-        guard let s = session else { return }
+        guard !didCommit else { return }
+        didCommit = true
+
+        guard let s = session else {
+            dismiss()
+            return
+        }
         do {
             try CacheManager.shared.commit(s, policy: .originalWins)
             onCommitted()
             dismiss()
         } catch {
             print("Commit error:", error)
+            dismiss()
         }
     }
 }
