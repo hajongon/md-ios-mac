@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "originHash" : "fb5f8e745dd10c26a22fc9ba04200b96b177dc460d4adf7dbde5ef4827eab291",
+=======
+  "originHash" : "8cda3fff086c94d55f69288f12e121973f2b953d6ac148920f71982aa030e795",
+>>>>>>> syntax-highlighting
   "pins" : [
     {
       "identity" : "highlightswift",
