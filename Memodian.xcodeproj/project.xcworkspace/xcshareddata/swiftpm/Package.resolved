@@ -1,6 +1,15 @@
 {
-  "originHash" : "427e2f78970f33b38feca26c7986bebb5f56cf55a388a29b6bade958aaa6607e",
+  "originHash" : "8cda3fff086c94d55f69288f12e121973f2b953d6ac148920f71982aa030e795",
   "pins" : [
+    {
+      "identity" : "highlightswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/appstefan/highlightswift",
+      "state" : {
+        "revision" : "784ca3ccfc8a2cf724fbb2f06cb6ec3329424da3",
+        "version" : "1.1.0"
+      }
+    },
     {
       "identity" : "markdownui",
       "kind" : "remoteSourceControl",

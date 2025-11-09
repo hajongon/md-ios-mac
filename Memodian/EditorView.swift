@@ -58,9 +58,9 @@ struct EditorView: View {
             ScrollView {
                 Markdown(text)
                     .markdownTheme(.gitHub)
+                    .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
                     .textSelection(.enabled)
                     .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }

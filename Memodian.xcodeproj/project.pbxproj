@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1395C6CB2EBCD28800368302 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1395C6CA2EBCD28800368302 /* MarkdownUI */; };
+		1395C6CE2EC04C7900368302 /* HighlightSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 1395C6CD2EC04C7900368302 /* HighlightSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1395C6CB2EBCD28800368302 /* MarkdownUI in Frameworks */,
+				1395C6CE2EC04C7900368302 /* HighlightSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = Memodian;
 			packageProductDependencies = (
 				1395C6CA2EBCD28800368302 /* MarkdownUI */,
+				1395C6CD2EC04C7900368302 /* HighlightSwift */,
 			);
 			productName = Memodian;
 			productReference = 1395C6A92EBB759A00368302 /* Memodian.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1395C6C92EBCD28800368302 /* XCRemoteSwiftPackageReference "MarkdownUI" */,
+				1395C6CC2EC04C7900368302 /* XCRemoteSwiftPackageReference "highlightswift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1395C6AA2EBB759A00368302 /* Products */;
@@ -345,6 +349,14 @@
 				minimumVersion = 2.4.1;
 			};
 		};
+		1395C6CC2EC04C7900368302 /* XCRemoteSwiftPackageReference "highlightswift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/appstefan/highlightswift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.9;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -352,6 +364,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1395C6C92EBCD28800368302 /* XCRemoteSwiftPackageReference "MarkdownUI" */;
 			productName = MarkdownUI;
+		};
+		1395C6CD2EC04C7900368302 /* HighlightSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1395C6CC2EC04C7900368302 /* XCRemoteSwiftPackageReference "highlightswift" */;
+			productName = HighlightSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
