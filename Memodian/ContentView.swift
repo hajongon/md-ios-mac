@@ -46,7 +46,7 @@ struct ContentView: View {
                     Button {
                         if let url = store.createNote() {
                             selectedNote = NoteRef(url: url)
-                            text = "# New Note\n\n"
+                            text = ""
                         }
                     } label: {
                         Image(systemName: "plus")

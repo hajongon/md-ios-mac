@@ -7,6 +7,8 @@
 
 
 
+// 파일: HighlightSwiftAdapter.swift
+
 import SwiftUI
 import MarkdownUI
 import HighlightSwift
@@ -14,10 +16,8 @@ import HighlightSwift
 @MainActor
 final class HLCache: ObservableObject {
     static let shared = HLCache()
-
     @Published var store: [String: AttributedString] = [:]
-    @Published var version: Int = 0 // NEW: 캐시 변경 감지를 위한 버전 카운터
-
+    @Published var version: Int = 0                  // ✅ 프리뷰 리렌더 트리거용
     private let highlighter = Highlight()
 
     private func key(for code: String, lang: String?) -> String {
@@ -34,38 +34,22 @@ final class HLCache: ObservableObject {
 
         Task {
             do {
-                let attr: AttributedString
+                let raw: AttributedString
                 if let lang, !lang.isEmpty {
-                    attr = try await highlighter.attributedText(code, language: lang)
+                    raw = try await highlighter.attributedText(code, language: lang)
                 } else {
-                    attr = try await highlighter.attributedText(code)
+                    raw = try await highlighter.attributedText(code)
                 }
-                store[k] = attr
-                version &+= 1          // NEW: 하이라이트 완료 → 버전 증가로 뷰 리렌더 트리거
+                // ✅ 폰트 제거: 크기는 바깥(MarkdownTextStyle)이 책임지도록
+                var stripped = raw
+                for run in stripped.runs {
+                    stripped[run.range].font = nil
+                }
+                store[k] = stripped
+                version &+= 1                           // ✅ 구독자에게 변경 알림
             } catch {
-                // 실패 시 plain 유지
+                // 실패 시 캐시에 넣지 않음(plain 렌더로 fallback)
             }
-        }
-    }
-
-    // NEW: 간단한 코드블록 스캐너(```lang ... ```), 프리뷰 전에 미리 ensure 호출
-    func prewarm(markdown: String) {
-        let lines = markdown.split(separator: "\n", omittingEmptySubsequences: false)
-        var i = 0
-        while i < lines.count {
-            let line = String(lines[i])
-            if line.hasPrefix("```") {
-                let lang = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-                var code = ""
-                i += 1
-                while i < lines.count, !String(lines[i]).hasPrefix("```") {
-                    code.append(String(lines[i]))
-                    code.append("\n")
-                    i += 1
-                }
-                ensure(code: code, lang: lang.isEmpty ? nil : lang)
-            }
-            i += 1
         }
     }
 }
@@ -75,10 +59,37 @@ struct HighlightSwiftAdapter: CodeSyntaxHighlighter {
 
     func highlightCode(_ content: String, language: String?) -> Text {
         if let attr = cache.get(code: content, lang: language) {
-            return Text(attr)
+            return Text(attr)                          // ✅ 폰트 없는 AttributedString (색상 등만 유지)
         } else {
             cache.ensure(code: content, lang: language)
-            return Text(content) // 첫 프레임은 평문, 이후 version 증가로 리렌더됨
+            return Text(content)                       // 최초엔 plain → 캐시 준비되면 다시 렌더
         }
     }
 }
+
+extension HLCache {
+    /// Markdown 문서 내의 코드블록들을 미리 하이라이트 캐싱
+    func prewarm(markdown: String) {
+        // ```lang ... ``` 형태의 코드 블록들을 정규식으로 추출
+        let pattern = #"```([\w+-]*)\n([\s\S]*?)```"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+
+        let range = NSRange(markdown.startIndex..<markdown.endIndex, in: markdown)
+        let matches = regex.matches(in: markdown, range: range)
+
+        for match in matches {
+            let langRange = match.range(at: 1)
+            let codeRange = match.range(at: 2)
+
+            let lang = langRange.location != NSNotFound
+                ? String(markdown[Range(langRange, in: markdown)!])
+                : nil
+            let code = codeRange.location != NSNotFound
+                ? String(markdown[Range(codeRange, in: markdown)!])
+                : ""
+
+            ensure(code: code, lang: lang)
+        }
+    }
+}
+

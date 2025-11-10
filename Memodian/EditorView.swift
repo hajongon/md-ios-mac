@@ -1,12 +1,10 @@
-//
-//  EditorView.swift
-//  Memodian
-//
-//  Created by hajongon on 11/5/25.
-//
+// EditorView.swift
 
 import SwiftUI
 import MarkdownUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 enum EditorMode: String, CaseIterable, Identifiable {
     case edit = "Edit"
@@ -26,8 +24,22 @@ struct EditorView: View {
     @FocusState private var isEditingFocused: Bool
     @State private var didCommit = false
 
-    // NEW: 캐시 옵저빙(버전 변화 감지)
+    // 캐시 옵저빙(버전 변화 감지)
     @ObservedObject private var hlCache = HLCache.shared
+
+    // ===== 폰트 스케일링 =====
+    // index 0 == 100%(최대, 초기 표시값), 뒤로 갈수록 더 작게
+    private let scaleSteps: [CGFloat] = [0.8, 0.7, 0.6, 0.5]
+    @State private var scaleIndex: Int = 0             // 시작이 '최대'
+    @State private var baseBodyPointSize: CGFloat = 17 // iOS 기본 body 크기. onAppear에서 가져옴
+
+    // Preview 리렌더 강제용 키
+    @State private var previewRerenderKey: Int = 0
+
+    private var currentScale: CGFloat { scaleSteps[scaleIndex] }
+    private var currentPointSize: CGFloat { baseBodyPointSize * currentScale }
+    private var canZoomOut: Bool { scaleIndex < scaleSteps.count - 1 } // 더 작게(–)
+    private var canZoomIn:  Bool { scaleIndex > 0 }                    // 더 크게(+), 최대는 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,11 +53,11 @@ struct EditorView: View {
 
             editorBody
         }
-        // .navigationTitle(mode == .edit ? "Edit" : "Preview")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
+            // 좌측: 공통 Back
             ToolbarItem(placement: .navigationBarLeading) {
                 Button { backCommitAndDismiss() } label: {
                     Image(systemName: "chevron.left")
@@ -56,46 +68,133 @@ struct EditorView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")
             }
+
+            // 우측: 편집 모드 전용 확대/축소
+            if mode == .edit {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        if canZoomOut { scaleIndex += 1 }
+                    } label: {
+                        Text("–")
+                            .font(.system(size: 18, weight: .semibold))
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(!canZoomOut)
+                    .accessibilityLabel("Font Smaller (Edit)")
+
+                    Button {
+                        if canZoomIn { scaleIndex -= 1 }
+                    } label: {
+                        Text("+")
+                            .font(.system(size: 18, weight: .semibold))
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(!canZoomIn)
+                    .accessibilityLabel("Font Larger (Edit)")
+                }
+            }
+
+            // 우측: 프리뷰 모드 전용 확대/축소 (브라우저 줌 느낌)
+            if mode == .preview {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        if canZoomOut {
+                            scaleIndex += 1
+                            previewRerenderKey &+= 1
+                        }
+                    } label: {
+                        Text("–")
+                            .font(.system(size: 18, weight: .semibold))
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(!canZoomOut)
+                    .accessibilityLabel("Zoom Out (Preview)")
+
+                    Button {
+                        if canZoomIn {
+                            scaleIndex -= 1
+                            previewRerenderKey &+= 1
+                        }
+                    } label: {
+                        Text("+")
+                            .font(.system(size: 18, weight: .semibold))
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(!canZoomIn)
+                    .accessibilityLabel("Zoom In (Preview)")
+                }
+            }
         }
-        .onAppear(perform: startIfNeeded)
+        .onAppear {
+            startIfNeeded()
+            #if canImport(UIKit)
+            baseBodyPointSize = UIFont.preferredFont(forTextStyle: .body).pointSize
+            #endif
+        }
         .onDisappear {
             autosaveWork?.cancel()
             backCommitAndDismiss()
         }
-        // NEW: 프리뷰로 바뀌는 시점에 코드블록을 미리 하이라이트
-        .onChange(of: mode) { old, new in
+        // 폰트 스케일 변화 감지 (프리뷰 강제 리렌더)
+        .onChange(of: scaleIndex) { _, newIndex in
+            previewRerenderKey &+= 1
+            // 디버그 로그
+            print("🔁 onChange scaleIndex → \(newIndex), previewRerenderKey=\(previewRerenderKey)")
+        }
+        // 프리뷰 진입 시 하이라이트 미리 준비(있으면 활용)
+        .onChange(of: mode) { _, new in
             if new == .preview {
-                HLCache.shared.prewarm(markdown: text)
+                HLCache.shared.prewarm(markdown: text) // 프로젝트에 있는 경우만 동작
             }
         }
+        // .animation(.easeInOut, value: scaleIndex) // 줌 전환 부드럽게
+        // 전체에는 애니메이션 X, 편집 모드일 때만 필요하다면:
+        .animation(mode == .edit ? .easeInOut : nil, value: scaleIndex)
+
     }
 
     @ViewBuilder
     private var editorBody: some View {
         if mode == .edit {
             TextEditor(text: $text)
-                .font(.system(.body, design: .monospaced))
+                .font(.system(size: currentPointSize, weight: .regular, design: .monospaced))
                 .focused($isEditingFocused)
                 .padding(.horizontal)
                 .onChange(of: text) { _, newValue in
                     scheduleAutosave(newValue)
-                    // 선택: 짧은 지연 후 프리워밍
+                    // 짧은 지연 후 프리워밍(있을 때만)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         HLCache.shared.prewarm(markdown: newValue)
                     }
                 }
-
-        } else {
-            ScrollView {
-                Markdown(text)
-                    .markdownTheme(.gitHub)
-                    .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
-                    .textSelection(.enabled)
-                    .padding()
-                    // NEW: 캐시가 채워질 때마다 id가 바뀌어 첫 프레임 이후 즉시 리렌더
-                    .id(hlCache.version)
+        }
+        else {
+            GeometryReader { geo in
+                ScrollView([.vertical, .horizontal]) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Markdown(text)
+                            .markdownTheme(.gitHub)
+                            .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
+                            .textSelection(.enabled)
+                            .padding()
+                    }
+                    // 렌더는 스케일링하되,
+                    // 레이아웃 폭은 1/scale 배로 늘려서 잘림 방지
+                    .scaleEffect(currentScale, anchor: .topLeading)
+                    .frame(width: geo.size.width / max(currentScale, 0.001), alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true) // 내부 높이 자연 확장
+                }
+                .id("preview-\(previewRerenderKey)-\(scaleIndex)")
+                .onAppear {
+                    print("🪶 preview appear → key=\(previewRerenderKey), scaleIndex=\(scaleIndex)")
+                }
             }
         }
+
     }
 
     private func startIfNeeded() {
