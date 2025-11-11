@@ -26,7 +26,6 @@ struct ContentView: View {
                         selectedNote = NoteRef(url: item.url)
                         text = (try? String(contentsOf: item.url, encoding: .utf8)) ?? ""
                     } label: {
-                        // spacing - 제목과 날짜 사이 간격
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.title.isEmpty ? "Untitled" : item.title)
                                 .font(.system(size: 14))
@@ -37,24 +36,27 @@ struct ContentView: View {
                                 .foregroundColor(.gray)
                                 .foregroundStyle(.secondary)
                         }
-                        // q.padding(.vertical, 1.5)
-                        // .padding(1)
-                        
-//                        .background(
-//                            RoundedRectangle(cornerRadius: 12)
-//                                .fill(Color(.systemGray6)) // ✅ 배경색
-//                        )
                     }
-                    // .buttonStyle(.plain) // ✅ 기본 버튼 하이라이트 제거
-                    // .listRowSeparator(.hidden) // ✅ 구분선 숨기기
-                    // .listRowInsets(EdgeInsets()) // ✅ 기본 List 여백 제거
-                    // .padding(.vertical, 1) // ✅ 셀 간 간격
+                    // ✅ 왼쪽 스와이프 시 우측 끝에 휴지통 아이콘 노출
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            store.delete(item.url)
+                            // 열려 있던 시트를 그 메모가 쓰고 있었다면 같이 정리
+                            if selectedNote?.url == item.url {
+                                selectedNote = nil
+                                text = ""
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .tint(.gray)
+                    }
                 }
+                // (선택) 편집 모드에서의 삭제 제스처도 계속 살려두고 싶다면 유지
                 .onDelete { idx in
                     idx.map { store.notes[$0].url }.forEach(store.delete)
                 }
-            } // ✅ 내부 여백 (이 값을 늘리거나 줄이면 됨)
-            // .navigationTitle("")
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -69,17 +71,13 @@ struct ContentView: View {
             }
             .sheet(item: $selectedNote) { noteRef in
                 NavigationStack {
-                    EditorView(
-                        text: $text,
-                        originalURL: noteRef.url
-                    ) {
+                    EditorView(text: $text, originalURL: noteRef.url) {
                         store.save(text, to: noteRef.url)
                         selectedNote = nil
                     }
-                    .navigationBarTitleDisplayMode(.inline) // 선택 사항: 타이틀 높이 줄이기
+                    .navigationBarTitleDisplayMode(.inline)
                 }
             }
-
         }
     }
 }
