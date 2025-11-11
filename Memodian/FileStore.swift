@@ -82,7 +82,7 @@ final class FileStore: NSObject, ObservableObject, NSFilePresenter {
         let name = "note-\(Int(Date().timeIntervalSince1970)).md"
         let url = notesDir.appendingPathComponent(name)
         do {
-            try "# New Note\n\n".write(to: url, atomically: true, encoding: .utf8)
+            try "".write(to: url, atomically: true, encoding: .utf8)
             loadNotes()
             return url
         } catch {
