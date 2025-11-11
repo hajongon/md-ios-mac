@@ -26,21 +26,35 @@ struct ContentView: View {
                         selectedNote = NoteRef(url: item.url)
                         text = (try? String(contentsOf: item.url, encoding: .utf8)) ?? ""
                     } label: {
+                        // spacing - 제목과 날짜 사이 간격
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.title.isEmpty ? "Untitled" : item.title)
-                                .font(.headline)
+                                .font(.system(size: 14))
+                                .foregroundColor(.black)
                                 .lineLimit(1)
                             Text(item.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
+                                .font(.system(size: 10))
+                                .foregroundColor(.gray)
                                 .foregroundStyle(.secondary)
                         }
+                        // q.padding(.vertical, 1.5)
+                        // .padding(1)
+                        
+//                        .background(
+//                            RoundedRectangle(cornerRadius: 12)
+//                                .fill(Color(.systemGray6)) // ✅ 배경색
+//                        )
                     }
+                    // .buttonStyle(.plain) // ✅ 기본 버튼 하이라이트 제거
+                    // .listRowSeparator(.hidden) // ✅ 구분선 숨기기
+                    // .listRowInsets(EdgeInsets()) // ✅ 기본 List 여백 제거
+                    // .padding(.vertical, 1) // ✅ 셀 간 간격
                 }
                 .onDelete { idx in
                     idx.map { store.notes[$0].url }.forEach(store.delete)
                 }
-            }
-            .navigationTitle("Notes")
+            } // ✅ 내부 여백 (이 값을 늘리거나 줄이면 됨)
+            // .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
