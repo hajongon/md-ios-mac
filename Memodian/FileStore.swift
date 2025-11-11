@@ -30,6 +30,7 @@ final class FileStore: NSObject, ObservableObject, NSFilePresenter {
             let icloudNotes = base.appendingPathComponent("Documents/notes", isDirectory: true)
             try? fm.createDirectory(at: icloudNotes, withIntermediateDirectories: true)
             notesDir = icloudNotes
+            migrateStrayNotes(to: notesDir)
             print("notesDir:", notesDir.path)
         } else {
             // 폴백: 로컬 Documents
@@ -119,5 +120,42 @@ private func firstLine(of url: URL) throws -> String {
         return String(text[..<newlineIdx])
     } else {
         return text
+    }
+}
+
+// notes 폴더가 여러개 생성된 상태라면 초기 실행 시 migrate 하는 함수
+private func migrateStrayNotes(to notesDir: URL) {
+    let parent = notesDir.deletingLastPathComponent()
+    let fm = FileManager.default
+    let candidates = ["notes 2", "notes 3"]
+
+    for name in candidates {
+        let stray = parent.appendingPathComponent(name, isDirectory: true)
+        guard (try? stray.checkResourceIsReachable()) == true else { continue }
+
+        if let items = try? fm.contentsOfDirectory(at: stray, includingPropertiesForKeys: nil) {
+            for src in items where src.pathExtension.lowercased() == "md" {
+                let dst = notesDir.appendingPathComponent(src.lastPathComponent)
+                if fm.fileExists(atPath: dst.path) {
+                    // 충돌 시 이름 바꿔 복사
+                    let base = dst.deletingPathExtension().lastPathComponent
+                    let ext  = dst.pathExtension
+                    var i = 1
+                    var alt = notesDir.appendingPathComponent("\(base) (copy \(i)).\(ext)")
+                    while fm.fileExists(atPath: alt.path) {
+                        i += 1
+                        alt = notesDir.appendingPathComponent("\(base) (copy \(i)).\(ext)")
+                    }
+                    try? fm.moveItem(at: src, to: alt)
+                } else {
+                    try? fm.moveItem(at: src, to: dst)
+                }
+            }
+        }
+
+        // 비었으면 정리
+        if let remain = try? fm.contentsOfDirectory(atPath: stray.path), remain.isEmpty {
+            try? fm.removeItem(at: stray)
+        }
     }
 }
