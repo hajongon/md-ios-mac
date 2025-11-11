@@ -105,27 +105,23 @@ struct EditorView: View {
                     }
                 }
         } else {
+            // (기존 preview 영역) GeometryReader 내부 교체
             GeometryReader { geo in
-                // ✅ 가로 스크롤 제거: 세로만 스크롤
-                ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Markdown(text)
-                            .markdownTheme(.gitHub)
-                            .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
-                            .textSelection(.enabled)
-                            .padding()
-                    }
-                    // ✅ 화면 폭 고정: 프레임을 넓히는 트릭 제거
-                    // 스케일만 적용하고 가로는 geo.width로 고정 → x축 스크롤 없음
-                    .frame(width: geo.size.width, alignment: .leading)
-                    .scaleEffect(currentScale, anchor: .topLeading)
+              ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                  Markdown(text)
+                    .markdownTheme(previewTheme(scale: currentScale))  // 👈 폰트만 스케일 변경
+                    .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
+                    .textSelection(.enabled)
+                    .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .clipped() // 선택: 경계 바깥 그리기 방지
                 }
-                // ✅ 강제 리렌더: 확대/축소 or 하이라이트 캐시 갱신 시
-                .id("preview-\(scaleIndex)-\(hl.version)-\(mode)")
+                .frame(width: geo.size.width, alignment: .leading)     // 배경 폭 고정
+                .fixedSize(horizontal: false, vertical: true)
+              }
+              .id("preview-\(scaleIndex)-\(hl.version)-\(mode)")
             }
+
         }
     }
 
