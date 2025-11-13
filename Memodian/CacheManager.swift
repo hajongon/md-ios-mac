@@ -70,35 +70,49 @@ final class CacheManager {
 
     // MARK: - 커밋(저장 종료 시 iCloud 반영)
     func commit(_ meta: NoteSessionMeta, policy: CommitPolicy = .originalWins) throws {
-        let text = try String(contentsOf: meta.cacheURL, encoding: .utf8)
+        // 1) 캐시/원본 내용 비교
+        let cacheText = (try? String(contentsOf: meta.cacheURL, encoding: .utf8)) ?? ""
+        let originalText = (try? String(contentsOf: meta.originalURL, encoding: .utf8)) ?? ""
+
+        // ✅ 내용이 완전히 동일하면: 아무것도 쓰지 않고 종료
+        if cacheText == originalText {
+            print("✅ commit: 내용 동일 → 원본 미변경, 캐시만 삭제")
+            try? FileManager.default.removeItem(at: meta.cacheURL)
+            return
+        }
+
+        // 2) 여기까지 왔다는 건 내용이 실제로 바뀌었다는 뜻
         let currentFP = fingerprint(for: meta.originalURL)
 
         switch (currentFP == meta.originalFingerprint, policy) {
         case (true, _):
             // 충돌 없음 → 원자적 교체
-            try coordinatedReplace(target: meta.originalURL, with: text)
+            try coordinatedReplace(target: meta.originalURL, with: cacheText)
 
         case (false, .originalWins):
             // 충돌 → 원본 유지, 캐시를 conflict copy로 보존
             let parent = meta.originalURL.deletingLastPathComponent()
             let base = meta.originalURL.deletingPathExtension().lastPathComponent
-            let stamp = Date().formatted(date: .numeric, time: .standard).replacingOccurrences(of: ":", with: "-")
+            let stamp = Date().formatted(date: .numeric, time: .standard)
+                .replacingOccurrences(of: ":", with: "-")
             let conflict = parent.appendingPathComponent("\(base) (conflict \(stamp)).md")
-            try text.write(to: conflict, atomically: true, encoding: .utf8)
+            try cacheText.write(to: conflict, atomically: true, encoding: .utf8)
 
         case (false, .cacheWins):
             // 충돌 → 원본 백업 후 캐시로 교체
             let parent = meta.originalURL.deletingLastPathComponent()
             let base = meta.originalURL.deletingPathExtension().lastPathComponent
-            let stamp = Date().formatted(date: .numeric, time: .standard).replacingOccurrences(of: ":", with: "-")
+            let stamp = Date().formatted(date: .numeric, time: .standard)
+                .replacingOccurrences(of: ":", with: "-")
             let backup = parent.appendingPathComponent("\(base) (backup \(stamp)).md")
             try? FileManager.default.moveItem(at: meta.originalURL, to: backup)
-            try coordinatedReplace(target: meta.originalURL, with: text)
+            try coordinatedReplace(target: meta.originalURL, with: cacheText)
         }
 
-        // 캐시 정리(선택)
+        // 3) 캐시 정리
         try? FileManager.default.removeItem(at: meta.cacheURL)
     }
+
 
     private func coordinatedReplace(target: URL, with text: String) throws {
         let coord = NSFileCoordinator(filePresenter: nil)

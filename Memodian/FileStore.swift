@@ -93,13 +93,21 @@ final class FileStore: NSObject, ObservableObject, NSFilePresenter {
     }
 
     func save(_ text: String, to url: URL) {
+        // 기존 내용과 같은지 비교
+        let old = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        if old == text {
+            print("⚠️ 내용 동일 → 저장 스킵")
+            return
+        }
+
         do {
             try text.write(to: url, atomically: true, encoding: .utf8)
-            loadNotes() // 저장 후 리스트 즉시 갱신(제목도 갱신)
+            loadNotes()
         } catch {
             print("Save error:", error)
         }
     }
+
 
     func delete(_ noteURL: URL) {
         do {
