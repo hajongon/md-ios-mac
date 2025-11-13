@@ -18,6 +18,7 @@ struct EditorView: View {
     var onCommitted: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme   // ← 다크/라이트 전환을 위해 추가
     @State private var session: NoteSessionMeta?
     @State private var autosaveWork: DispatchWorkItem?
     @State private var mode: EditorMode = .edit
@@ -82,10 +83,18 @@ struct EditorView: View {
             autosaveWork?.cancel()
             backCommitAndDismiss()
         }
+        
         // 프리뷰 진입 시 하이라이트 캐시 미리 준비
+        // 프리뷰 진입 시 prewarm도 테마 맞춰 호출
         .onChange(of: mode) { _, new in
-            if new == .preview { HLCache.shared.prewarm(markdown: text) }
+            if new == .preview {
+                HLCache.shared.prewarm(
+                    markdown: text,
+                    isDark: colorScheme == .dark
+                )
+            }
         }
+
         // 편집 모드에서만 줌 전환 애니메이션
         .animation(mode == .edit ? .easeInOut : nil, value: scaleIndex)
     }
@@ -94,36 +103,48 @@ struct EditorView: View {
     private var editorBody: some View {
         if mode == .edit {
             TextEditor(text: $text)
-                .font(.system(size: currentPointSize, weight: .regular, design: .monospaced))
+                .font(.system(size: currentPointSize,
+                              weight: .regular,
+                              design: .monospaced))
                 .focused($isEditingFocused)
                 .padding(.horizontal)
                 .onChange(of: text) { _, newValue in
                     scheduleAutosave(newValue)
-                    // 짧은 지연 후 프리워밍(있을 때만)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        HLCache.shared.prewarm(markdown: newValue)
+                        HLCache.shared.prewarm(
+                            markdown: newValue,
+                            isDark: colorScheme == .dark
+                        )
                     }
                 }
         } else {
-            // (기존 preview 영역) GeometryReader 내부 교체
             GeometryReader { geo in
-              ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 0) {
-                  Markdown(text)
-                    .markdownTheme(previewTheme(scale: currentScale))  // 👈 폰트만 스케일 변경
-                    .markdownCodeSyntaxHighlighter(HighlightSwiftAdapter())
-                    .textSelection(.enabled)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Markdown(text)
+                            .markdownTheme(
+                                previewTheme(
+                                    scale: currentScale,
+                                    colorScheme: colorScheme
+                                )
+                            )
+                            .markdownCodeSyntaxHighlighter(
+                                HighlightSwiftAdapter(
+                                    isDark: colorScheme == .dark
+                                )
+                            )
+                            .textSelection(.enabled)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(width: geo.size.width, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(width: geo.size.width, alignment: .leading)     // 배경 폭 고정
-                .fixedSize(horizontal: false, vertical: true)
-              }
-              .id("preview-\(scaleIndex)-\(hl.version)-\(mode)")
+                .id("preview-\(scaleIndex)-\(hl.version)-\(mode)-\(colorScheme == .dark ? "dark" : "light")")
             }
-
         }
     }
+
 
     // 공통 확대/축소 버튼
     @ViewBuilder

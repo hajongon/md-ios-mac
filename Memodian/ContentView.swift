@@ -17,6 +17,7 @@ struct ContentView: View {
     @StateObject private var store = FileStore()
     @State private var selectedNote: NoteRef?
     @State private var text = ""
+    @Environment(\.colorScheme) private var colorScheme   // ← 다크/라이트 전환을 위해 추가
 
     var body: some View {
         NavigationStack {
@@ -29,12 +30,12 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.title.isEmpty ? "Untitled" : item.title)
                                 .font(.system(size: 14))
-                                .foregroundColor(.black)
+                                .foregroundColor(colorScheme == .dark ? .white : .black)
                                 .lineLimit(1)
                             Text(item.updatedAt.formatted(date: .abbreviated, time: .shortened))
                                 .font(.system(size: 10))
                                 .foregroundColor(.gray)
-                                .foregroundStyle(.secondary)
+                                // .foregroundStyle(.secondary)
                         }
                     }
                     // ✅ 왼쪽 스와이프 시 우측 끝에 휴지통 아이콘 노출
