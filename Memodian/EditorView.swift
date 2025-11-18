@@ -24,6 +24,11 @@ struct EditorView: View {
     @State private var mode: EditorMode = .edit
     @FocusState private var isEditingFocused: Bool
     @State private var didCommit = false
+    
+    // 우측 스크롤로 화면 전환
+    @State private var dragOffsetX: CGFloat = 0
+    private let swipeDismissThreshold: CGFloat = 80
+
 
     // 하이라이트 캐시 구독(리렌더 트리거에 사용)
     @ObservedObject private var hl = HLCache.shared
@@ -52,6 +57,33 @@ struct EditorView: View {
 
             editorBody
         }
+        // 👇 스와이프 제스처용 offset
+        .offset(x: dragOffsetX)
+        // 👇 좌로 스와이프해서 목록으로 돌아가기
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    // 세로로 크게 움직인 드래그는 무시 (스크롤 제스처와 충돌 방지)
+                    guard abs(value.translation.height) < 40 else { return }
+
+                    // 👉 오른쪽으로 움직일 때만 오프셋 적용 (왼쪽 스와이프는 화면 안 끌려가게)
+                    if value.translation.width > 0 {
+                        dragOffsetX = value.translation.width
+                    } else {
+                        dragOffsetX = 0
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.width > swipeDismissThreshold {
+                        backCommitAndDismiss()
+                    } else {
+                        // threshold 미만이면 원위치 복귀
+                        withAnimation(.easeOut) {
+                            dragOffsetX = 0
+                        }
+                    }
+                }
+        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -144,6 +176,7 @@ struct EditorView: View {
             }
         }
     }
+    
 
 
     // 공통 확대/축소 버튼

@@ -70,7 +70,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .sheet(item: $selectedNote) { noteRef in
+            .fullScreenCover(item: $selectedNote) { noteRef in
                 NavigationStack {
                     EditorView(text: $text, originalURL: noteRef.url) {
                         store.save(text, to: noteRef.url)
